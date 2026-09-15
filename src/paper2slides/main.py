@@ -1,4 +1,5 @@
 import argparse
+import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,6 +14,15 @@ class ExtractedImage:
     width: int
     height: int
     caption: str
+
+
+@dataclass
+class Article:
+    source_path: Path
+    title: str
+    page_count: int
+    text: str
+    images: list[ExtractedImage]
 
 
 def read_pdf_text(pdf_path: Path) -> tuple[int, str]:
@@ -102,6 +112,72 @@ def extract_images(pdf_path: Path, output_dir: Path) -> list[ExtractedImage]:
     return extracted_images
 
 
+def find_article_title(text: str, pdf_path: Path) -> str:
+    """Find article title from the first non-empty text line"""
+    for line in text.splitlines():
+        candidate = line.strip()
+        if candidate:
+            continue
+
+        if candidate.startswith("--- Page"):
+            continue
+
+        if len(candidate) > 10:
+            return candidate[:150]
+
+    return pdf_path.stem.replace("_", " ")
+
+
+def build_article(pdf_path: Path, images_dir: Path) -> Article:
+    """Build one structured object containing the extracted paper data"""
+    page_count, text = read_pdf_text(pdf_path)
+    images = extract_images(pdf_path, images_dir)
+    title = find_article_title(text, pdf_path)
+
+    return Article(
+        source_path=pdf_path,
+        title=title,
+        page_count=page_count,
+        text=text,
+        images=images,
+    )
+
+
+def article_to_dict(article: Article) -> dict:
+    """Convert an Article object into JSON-friendly data"""
+    return {
+        "source_path": str(article.source_path),
+        "title": article.title,
+        "page_count": article.page_count,
+        "text": article.text,
+        "images": [
+            {
+                "page_number": image.page_num,
+                "path": str(image.path),
+                "width": image.width,
+                "height": image.height,
+                "caption": image.caption,
+            }
+            for image in article.images
+        ],
+    }
+
+
+def save_article_json(article: Article, output_path: Path) -> None:
+    """Save the extracted article data to a JSON file"""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    article_data = article_to_dict(article)
+
+    output_path.write_text(
+        json.dumps(
+            article_data,
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf8",
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Extract text from PDF"
@@ -117,6 +193,12 @@ def main() -> None:
         default=Path("data/extracted_images"),
         help="Directory to save extracted images",
     )
+    parser.add_argument(
+        "--article-json",
+        type=Path,
+        default=Path("data/article.json"),
+        help="Path to article JSON file",
+    )
 
     args = parser.parse_args()
 
@@ -126,23 +208,26 @@ def main() -> None:
     if args.pdf_path.suffix.lower() != ".pdf":
         parser.error(f"file '{args.pdf_path}' is not a PDF file")
 
-    page_count, text = read_pdf_text(args.pdf_path)
-    images = extract_images(args.pdf_path, args.images_dir)
+    article = build_article(args.pdf_path, args.images_dir)
+    save_article_json(article, args.article_json)
 
-    print(f"\nPages: {page_count}")
-    print(f"Characters extracted: {len(text)}")
-    print(f"Images extracted: {len(images)}")
+    print(f"\nTitle: {article.title}")
+    print(f"Pages: {article.page_count}")
+    print(f"Characters extracted: {len(article.text)}")
+    print(f"Images extracted: {len(article.images)}")
 
     print("\n--- Extracted images ---")
-    for image in images:
+    for image in article.images:
         print(
             f"\nPage {image.page_num}: "
             f"{image.path} ({image.width} x {image.height})"
         )
         print(f"Caption: {image.caption}")
 
+    print(f"Article JSON saved to: {args.article_json}")
+
     print("\n--- Text preview ---")
-    print(text[:2000])
+    print(article.text[:2000])
 
 
 if __name__ == "__main__":
