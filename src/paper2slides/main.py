@@ -1,4 +1,5 @@
 import argparse
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -11,6 +12,7 @@ class ExtractedImage:
     path: Path
     width: int
     height: int
+    caption: str
 
 
 def read_pdf_text(pdf_path: Path) -> tuple[int, str]:
@@ -26,6 +28,36 @@ def read_pdf_text(pdf_path: Path) -> tuple[int, str]:
             )
 
         return doc.page_count, "\n".join(pages)
+
+
+def find_caption(page: pymupdf.Page, xref: int) -> str:
+    """Find a likely figure caption bellow an image"""
+    image_rectangles = page.get_image_rects(xref)
+    if not image_rectangles:
+        return "Caption not found"
+
+    image_bottom = image_rectangles[0].y1
+    text_blocks = page.get_text("blocks")
+
+    possible_captions = []
+    for block in text_blocks:
+        block_top = block[1]
+        block_text = block[4].strip()
+
+        is_below_image = block_top >= image_bottom
+        looks_like_caption = re.match(
+            r"^(Figure|Fig\.)\s*\d+",
+            block_text,
+            re.IGNORECASE,
+        )
+
+        if is_below_image and looks_like_caption:
+            possible_captions.append(block_text.replace("\n", " "))
+
+    if not possible_captions:
+        return "Caption not found"
+
+    return possible_captions[0]
 
 
 def extract_images(pdf_path: Path, output_dir: Path) -> list[ExtractedImage]:
@@ -50,6 +82,8 @@ def extract_images(pdf_path: Path, output_dir: Path) -> list[ExtractedImage]:
                 if width < 120 or height < 120:
                     continue
 
+                caption = find_caption(page, xref)
+
                 extension = image_info["ext"]
                 image_path = output_dir / f"page_{page_num}_image_{image_num}.{extension}"
 
@@ -61,6 +95,7 @@ def extract_images(pdf_path: Path, output_dir: Path) -> list[ExtractedImage]:
                         path=image_path,
                         width=width,
                         height=height,
+                        caption=caption,
                     )
                 )
 
@@ -101,9 +136,10 @@ def main() -> None:
     print("\n--- Extracted images ---")
     for image in images:
         print(
-            f"Page {image.page_num}: "
+            f"\nPage {image.page_num}: "
             f"{image.path} ({image.width} x {image.height})"
         )
+        print(f"Caption: {image.caption}")
 
     print("\n--- Text preview ---")
     print(text[:2000])
