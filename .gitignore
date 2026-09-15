@@ -4,4 +4,6 @@ __pycache__/
 data/
 outputs/
 *.pptx
+*.pdf
 .idea
+.DS_Store
