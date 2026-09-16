@@ -7,3 +7,5 @@ outputs/
 *.pdf
 .idea
 .DS_Store
+node_modules/
+outputs/

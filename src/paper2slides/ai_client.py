@@ -92,6 +92,19 @@ PRESENTATION_PLAN_SCHEMA = {
 }
 
 
+def get_language_instruction(language: str) -> str:
+    """Return a clear natural language instruction for output language"""
+    language_instruction = {
+        "fa": (
+            "Persian (Farsi), written entirely in Persian script. "
+            "Do not write English except for unavoidable proper nouns."
+        ),
+        "en": "English",
+    }
+
+    return language_instruction.get(language, language)
+
+
 def get_ollama_client() -> Client:
     """Create a client for the locally running Ollama server"""
     load_dotenv()
@@ -104,6 +117,7 @@ def summarize_article(title: str, text: str, language: str) -> dict[str, Any]:
     """Ask a local research-reader agent for a structured summary"""
     client = get_ollama_client()
     model = os.getenv("OLLAMA_MODEL", "qwen3:4b")
+    language_instruction = get_language_instruction(language)
 
     article_text = text[:MAX_ARTICLE_CHARACTERS]
 
@@ -117,7 +131,7 @@ def summarize_article(title: str, text: str, language: str) -> dict[str, Any]:
                     "Summarize the supplied academic paper accurately. "
                     "Include the research question, method, main findings, "
                     "and limitations. Do not invent facts or numbers. "
-                    f"Write the answer in {language}."
+                    f"Write all JSON values in {language_instruction}."
                 ),
             },
             {
@@ -148,6 +162,7 @@ def plan_presentation(
     """Ask the planner agent to create a structured slide plan"""
     client = get_ollama_client()
     model = os.getenv("OLLAMA_MODEL", "qwen3:4b")
+    language_instruction = get_language_instruction(language)
 
     planning_input = json.dumps(
         {
@@ -180,7 +195,7 @@ def plan_presentation(
                     "If no image is relevant, use null for image_path. "
                     "Do not invent facts or numbers. "
                     "Return only valid JSON, with no markdown or extra text. "
-                    f"Write all JSON values in {language}."
+                    f"Write all JSON values in {language_instruction}."
                 ),
             },
             {
@@ -215,6 +230,7 @@ def review_presentation_plan(
     """Review image choices and their relationship to each slide"""
     client = get_ollama_client()
     model = os.getenv("OLLAMA_MODEL", "qwen3:4b")
+    language_instruction = get_language_instruction(language)
 
     slide_count = len(presentation_plan["slides"])
 
@@ -251,7 +267,7 @@ def review_presentation_plan(
                     "Do not invent facts or numbers. "
                     "Keep the same number of slides. "
                     "Return only valid JSON, with no markdown or extra text. "
-                    f"Write all JSON values in {language}."
+                    f"Write all JSON values in {language_instruction}."
                 ),
             },
             {
