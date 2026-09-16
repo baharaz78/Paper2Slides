@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pymupdf
 
-from ai_client import summarize_article
+from ai_client import summarize_article, plan_presentation, review_presentation_plan
 
 
 @dataclass
@@ -211,6 +211,23 @@ def main() -> None:
         default="en",
         help="Language for the AI summary",
     )
+    parser.add_argument(
+        "--plan",
+        action="store_true",
+        help="Generate an AI presentation plan",
+    )
+    parser.add_argument(
+        "--slides",
+        type=int,
+        choices=range(4, 10),
+        default=5,
+        help="Number of slides in presentation plan",
+    )
+    parser.add_argument(
+        "--review",
+        action="store_true",
+        help="Review image and text relationships in the presentation plan",
+    )
 
     args = parser.parse_args()
 
@@ -223,7 +240,11 @@ def main() -> None:
     article = build_article(args.pdf_path, args.images_dir)
     save_article_json(article, args.article_json)
 
-    if args.summarize:
+    summary = None
+    presentation_plan = None
+    candidate_images = []
+
+    if args.summarize or args.plan or args.review:
         summary = summarize_article(
             title=article.title,
             text=article.text,
@@ -239,33 +260,50 @@ def main() -> None:
             encoding="utf8",
         )
 
-        print(f"Summary saved to: {summary_path}")
-        print("\n--- AI Summary ---")
-        print(
+    if args.plan or args.review:
+        candidate_images = [
+            {
+                "page_num": image.page_num,
+                "path": str(image.path),
+                "caption": image.caption,
+            }
+            for image in article.images
+        ]
+        presentation_plan = plan_presentation(
+            summary=summary,
+            images=candidate_images,
+            slide_count=args.slides,
+            language=args.language,
+        )
+
+        plan_path = Path("data/presentation_plan.json")
+        plan_path.write_text(
             json.dumps(
-                summary,
+                presentation_plan,
                 ensure_ascii=False,
                 indent=2,
-            )
+            ),
+            encoding="utf8",
         )
 
-    print(f"\nTitle: {article.title}")
-    print(f"Pages: {article.page_count}")
-    print(f"Characters extracted: {len(article.text)}")
-    print(f"Images extracted: {len(article.images)}")
-
-    print("\n--- Extracted images ---")
-    for image in article.images:
-        print(
-            f"\nPage {image.page_num}: "
-            f"{image.path} ({image.width} x {image.height})"
+    if args.review:
+        reviewed_presentation_plan = review_presentation_plan(
+            presentation_plan=presentation_plan,
+            images=candidate_images,
+            language=args.language,
         )
-        print(f"Caption: {image.caption}")
 
-    print(f"Article JSON saved to: {args.article_json}")
-
-    print("\n--- Text preview ---")
-    print(article.text[:2000])
+        reviewed_plan_path = Path(
+            "data/reviewed_presentation_plan.json"
+        )
+        reviewed_plan_path.write_text(
+            json.dumps(
+                reviewed_presentation_plan,
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
 
 
 if __name__ == "__main__":
