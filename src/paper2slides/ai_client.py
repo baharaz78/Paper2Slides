@@ -1,9 +1,42 @@
+import json
 import os
+from typing import Any
 
 from dotenv import load_dotenv
 from ollama import Client
 
 MAX_ARTICLE_CHARACTERS = 30_000
+
+RESEARCH_SUMMARY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "research_question": {
+            "type": "string",
+        },
+        "method": {
+            "type": "string",
+        },
+        "main_finding": {
+            "type": "array",
+            "items": {
+                "type": "string",
+            },
+        },
+        "limitations": {
+            "type": "array",
+            "items": {
+                "type": "string",
+            },
+        },
+    },
+    "required": [
+        "research_question",
+        "method",
+        "main_finding",
+        "limitations"
+    ],
+    "additionalProperties": False,
+}
 
 
 def get_ollama_client() -> Client:
@@ -14,8 +47,8 @@ def get_ollama_client() -> Client:
     return Client(host=host)
 
 
-def summarize_article(title: str, text: str, language: str) -> str:
-    """Ask the research-reader agent to summarize an article"""
+def summarize_article(title: str, text: str, language: str) -> dict[str, Any]:
+    """Ask a local research-reader agent for a structured summary"""
     client = get_ollama_client()
     model = os.getenv("OLLAMA_MODEL", "qwen3:4b")
 
@@ -42,6 +75,15 @@ def summarize_article(title: str, text: str, language: str) -> str:
                 ),
             },
         ],
+        format=RESEARCH_SUMMARY_SCHEMA,
+        options={
+            "temperature": 0,
+        },
     )
 
-    return response.message.content
+    try:
+        return json.loads(response.message.content)
+    except json.JSONDecodeError as err:
+        raise RuntimeError(
+            "The local model did not return valid JSON"
+        ) from err

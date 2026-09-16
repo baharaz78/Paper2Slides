@@ -8,6 +8,7 @@ import pymupdf
 
 from ai_client import summarize_article
 
+
 @dataclass
 class ExtractedImage:
     page_num: int
@@ -228,12 +229,25 @@ def main() -> None:
             text=article.text,
             language=args.language,
         )
-        summary_path = Path("data/article_summary.txt")
-        summary_path.write_text(summary, encoding="utf8")
+        summary_path = Path("data/article_summary.json")
+        summary_path.write_text(
+            json.dumps(
+                summary,
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf8",
+        )
 
         print(f"Summary saved to: {summary_path}")
         print("\n--- AI Summary ---")
-        print(summary)
+        print(
+            json.dumps(
+                summary,
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
 
     print(f"\nTitle: {article.title}")
     print(f"Pages: {article.page_count}")
