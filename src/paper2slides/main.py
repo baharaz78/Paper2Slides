@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pymupdf
 
+from ai_client import summarize_article
 
 @dataclass
 class ExtractedImage:
@@ -199,6 +200,16 @@ def main() -> None:
         default=Path("data/article.json"),
         help="Path to article JSON file",
     )
+    parser.add_argument(
+        "--summarize",
+        action="store_true",
+        help="Generate an AI summary of the article",
+    )
+    parser.add_argument(
+        "--language",
+        default="en",
+        help="Language for the AI summary",
+    )
 
     args = parser.parse_args()
 
@@ -210,6 +221,19 @@ def main() -> None:
 
     article = build_article(args.pdf_path, args.images_dir)
     save_article_json(article, args.article_json)
+
+    if args.summarize:
+        summary = summarize_article(
+            title=article.title,
+            text=article.text,
+            language=args.language,
+        )
+        summary_path = Path("data/article_summary.txt")
+        summary_path.write_text(summary, encoding="utf8")
+
+        print(f"Summary saved to: {summary_path}")
+        print("\n--- AI Summary ---")
+        print(summary)
 
     print(f"\nTitle: {article.title}")
     print(f"Pages: {article.page_count}")

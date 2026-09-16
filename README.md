@@ -39,8 +39,9 @@ Editable PowerPoint Presentation
 ## Requirements
 
 - Python 3.12 or newer
-- [uv](https://docs.astral.sh/uv/)
-- An OpenAI API key
+- uv
+- Ollama
+- A local Ollama model, such as `qwen3:4b`
 - Node.js with the PowerPoint rendering runtime
 
 ## Installation
@@ -50,14 +51,8 @@ git clone git@github.com:baharaz78/Paper2Slides.git
 cd Paper2Slides
 
 uv sync
+ollama pull qwen3:4b
 cp .env.example .env
-```
-
-Add your OpenAI API key to `.env`:
-
-```env
-OPENAI_API_KEY=your_api_key_here
-OPENAI_MODEL=gpt-5-mini
 ```
 
 ## Usage
